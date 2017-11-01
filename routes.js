@@ -6,7 +6,7 @@
 
 var gravatar = require('gravatar');
 
-// Export a function, so that we can pass 
+// Export a function, so that we can pass
 // the app and io instances from the app.js file:
 
 module.exports = function(app,io){
@@ -16,6 +16,26 @@ module.exports = function(app,io){
 		// Render views/home.html
 		res.render('home');
 	});
+
+	app.get('/admin', function(req, res){
+		// Render views/admin.html
+		res.render('admin');
+	});
+
+	// Created an empty array to store socket objects to be passed on the admin page.
+	// this array would be populated once the user logs in.
+	var connectedSockets =[];
+
+	// Send connectedsockets array to the admin page.
+	app.get('/connectedsocketids', function(req, res) {
+	res.send(connectedSockets);
+	})
+
+  var deletedSockets =[];
+	// Send deletedsockets array to the admin page.
+	app.get('/deletedsocketids', function(req, res) {
+	res.send(deletedSockets);
+	})
 
 	app.get('/create', function(req,res){
 
@@ -35,8 +55,9 @@ module.exports = function(app,io){
 	// Initialize a new socket.io application, named 'chat'
 	var chat = io.on('connection', function (socket) {
 
-		// When the client emits the 'load' event, reply with the 
+		// When the client emits the 'load' event, reply with the
 		// number of people in this chat room
+      console.log(socket.id+' Socket id connected');
 
 		socket.on('load',function(data){
 
@@ -75,6 +96,10 @@ module.exports = function(app,io){
 				socket.room = data.id;
 				socket.avatar = gravatar.url(data.avatar, {s: '140', r: 'x', d: 'mm'});
 
+				// Create and socket object and push into the connectedSockets array.
+				var socketobject = {id:socket.id,username:socket.username,roomid:socket.room};
+				connectedSockets.push(socketobject);
+
 				// Tell the person what he should use for an avatar
 				socket.emit('img', socket.avatar);
 
@@ -111,6 +136,17 @@ module.exports = function(app,io){
 
 		// Somebody left the chat
 		socket.on('disconnect', function() {
+			  // Notify on console the Socket id of person left.
+			  console.log(socket.id+' Socket id disconnected');
+			//	var socketobject = {id:socket.id,username:socket.username,roomid:socket.room};
+				deletedSockets.push(socket.id);
+        // find the index of the object having socket id which left.
+				var index = connectedSockets.findIndex(function(o){
+     				return o.id === socket.id;
+        });
+
+				// Remove the socket object from the connected array.
+        if (index !== -1) connectedSockets.splice(index, 1);
 
 			// Notify the other person in the chat room
 			// that his partner has left
@@ -134,6 +170,9 @@ module.exports = function(app,io){
 			socket.broadcast.to(socket.room).emit('receive', {msg: data.msg, user: data.user, img: data.img});
 		});
 	});
+
+
+
 };
 
 function findClientsSocket(io,roomId, namespace) {
@@ -156,5 +195,3 @@ function findClientsSocket(io,roomId, namespace) {
 	}
 	return res;
 }
-
-
